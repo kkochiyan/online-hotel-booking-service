@@ -1,0 +1,10 @@
+[tool.black]
+line-length = 88
+target-version = ['py313']
+
+[tool.autoflake]
+check_diff = true
+import = ['passlib']
+
+[tool.pyright]
+include = ["app"]
