@@ -1,15 +1,6 @@
 from pydantic import BaseModel
 from typing import Union
 
-class SHotels(BaseModel):
-    id: int
-    name: str
-    location: str
-    services: Union[dict, list]
-    rooms_quantity: int
-    image_id: int
-    rooms_left: int
-
 
 class SHotel(BaseModel):
     id: int
@@ -18,3 +9,6 @@ class SHotel(BaseModel):
     services: Union[dict, list]
     rooms_quantity: int
     image_id: int
+
+class SHotelInfo(SHotel):
+    rooms_left: int

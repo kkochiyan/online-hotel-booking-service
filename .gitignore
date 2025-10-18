@@ -1,0 +1,6 @@
+venv
+.env
+.env-non-dev
+.env-render
+__pacache__
+*.ipynb*

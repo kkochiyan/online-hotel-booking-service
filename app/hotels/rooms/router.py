@@ -1,19 +1,22 @@
-from fastapi import APIRouter
-from datetime import date
+from datetime import date, datetime, timedelta
+
+from fastapi import Query, APIRouter
 
 from app.hotels.rooms.dao import RoomDAO
-from app.exceptions import NoRoomsInThisHotelException
-from app.hotels.rooms.schemas import SRoom
+from app.hotels.rooms.schemas import SRoomInfo
+from fastapi_cache.decorator import cache
 
 router = APIRouter(
     prefix='/hotels',
-    tags=['Отели']
+    tags=['Комнаты']
 )
 
-
 @router.get('/{hotel_id}/rooms')
-async def get_rooms_by_time(hotel_id: int, date_from: date, date_to: date) -> list[SRoom]:
-    rooms = await RoomDAO.search_rooms(hotel_id, date_from, date_to)
-    if not rooms:
-        raise NoRoomsInThisHotelException
+@cache(expire=30)
+async def get_rooms_by_time(
+        hotel_id: int,
+        date_from: date = Query(..., description=f"Например, {datetime.now().date()}"),
+        date_to: date = Query(..., description=f"Наример, {(datetime.now() + timedelta(days=14)).date()}")
+) -> list[SRoomInfo]:
+    rooms = await RoomDAO.find_all(hotel_id, date_from, date_to)
     return rooms

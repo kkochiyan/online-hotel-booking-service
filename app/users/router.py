@@ -5,38 +5,45 @@ from app.users.dao import UsersDAO
 from app.users.auth import get_hashed_password, authenticate_user, create_access_token
 from app.users.models import Users
 from app.users.dependencies import get_current_user
-from app.exceptions import UserAlreadyExistException, IncorrectEmailOrPasswordException
+from app.exceptions import (UserAlreadyExistsException,
+                            CannotAddDataToDatabase)
 
 
-router = APIRouter(
+router_auth = APIRouter(
     prefix='/auth',
-    tags=['Auth & Пользователи']
+    tags=['Auth']
 )
 
-@router.post('/register')
+router_users = APIRouter(
+    prefix='/users',
+    tags=['Пользователи']
+)
+
+
+@router_auth.post('/register', status_code=201)
 async def register_user(user_data: SUserAuth):
     existing_user = await UsersDAO.find_one_or_none(email=user_data.email)
     if existing_user:
-        raise UserAlreadyExistException
+        raise UserAlreadyExistsException
     hashed_password = get_hashed_password(user_data.password)
-    await UsersDAO.add(email=user_data.email, hashed_password=hashed_password)
+    new_user = await UsersDAO.add(email=user_data.email, hashed_password=hashed_password)
+    if not new_user:
+        raise CannotAddDataToDatabase
 
 
-@router.post('/login')
+@router_auth.post('/login')
 async def login_user(user_data: SUserAuth, response: Response):
     user = await authenticate_user(user_data.email, user_data.password)
-    if not user:
-        raise IncorrectEmailOrPasswordException
     access_token = create_access_token({'sub': str(user.id)})
     response.set_cookie('booking_access_token', access_token, httponly=True)
-    return access_token
+    return {"access_token": access_token}
 
 
-@router.post('/logout')
+@router_auth.post('/logout')
 async def logout_user(response: Response):
     response.delete_cookie('booking_access_token')
 
 
-@router.get('/me')
+@router_users.get('/me')
 async def read_users_me(current_user: Users = Depends(get_current_user)):
     return current_user

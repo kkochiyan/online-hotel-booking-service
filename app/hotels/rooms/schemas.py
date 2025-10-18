@@ -10,5 +10,8 @@ class SRoom(BaseModel):
     price: int
     quantity: int
     image_id: int
+
+
+class SRoomInfo(SRoom):
     total_cost: int
     rooms_left: int

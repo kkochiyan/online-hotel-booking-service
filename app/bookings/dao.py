@@ -7,10 +7,26 @@ from app.bookings.models import Bookings
 from app.hotels.rooms.models import Rooms
 from app.database import async_session_maker
 from app.logger import logger
+from app.exceptions import RoomFullyBooked
+
 
 
 class BookingDAO(BaseDAO):
     model = Bookings
+
+    @classmethod
+    async def find_all_with_images(cls, user_id: int):
+        async with async_session_maker() as session:
+            query = (
+                select(
+                    Bookings.__table__.columns,
+                    Rooms.__table__.columns,
+                )
+                .join(Rooms, Rooms.id == Bookings.room_id, isouter=True)
+                .where(Bookings.user_id == user_id)
+            )
+            result = await session.execute(query)
+            return result.mappings().all()
 
     @classmethod
     async def add(cls, user_id: int, room_id: int, date_from: date, date_to: date):
@@ -28,7 +44,7 @@ class BookingDAO(BaseDAO):
                                 ),
                                 and_(
                                     Bookings.date_from <= date_from,
-                                    Bookings.date_to >= date_from,
+                                    Bookings.date_to > date_from,
                                 ),
                             ),
                         )
@@ -51,6 +67,8 @@ class BookingDAO(BaseDAO):
                 rooms_left = await session.execute(get_rooms_left)
                 rooms_left: int = rooms_left.scalar()
 
+                logger.debug(f'{rooms_left=}')
+
                 if rooms_left > 0:
                     get_price = select(Rooms.price).filter_by(id=room_id)
                     price = await session.execute(get_price)
@@ -64,20 +82,27 @@ class BookingDAO(BaseDAO):
                             date_to=date_to,
                             price=price,
                         )
-                        .returning(Bookings)
+                        .returning(
+                            Bookings.id,
+                            Bookings.user_id,
+                            Bookings.room_id,
+                            Bookings.date_from,
+                            Bookings.date_to
+                        )
                     )
 
                     new_booking = await session.execute(add_booking)
                     await session.commit()
-                    return new_booking.scalar()
+                    return new_booking.mappings().one()
                 else:
-                    return None
+                    raise RoomFullyBooked
+        except RoomFullyBooked:
+            raise RoomFullyBooked
         except (SQLAlchemyError, Exception) as e:
             if isinstance(e, SQLAlchemyError):
-                msg = "Databade Exc"
+                msg = "Databade Exc: Cannot add booking"
             elif isinstance(e, Exception):
-                msg = "Unknown EXC"
-            msg += ': Cannot add booking'
+                msg = "Unknown EXC: Cannot add booking"
             extra = {
                 "user_id": user_id,
                 "room_id": room_id,

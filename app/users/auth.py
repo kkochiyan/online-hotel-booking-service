@@ -5,19 +5,20 @@ from jose import jwt
 
 from app.users.dao import UsersDAO
 from app.config import settings
+from app.exceptions import IncorrectEmailOrPasswordException
 
 pwd_context = CryptContext(schemes=['bcrypt'], deprecated='auto')
 
 def get_hashed_password(password: str) -> str:
     return pwd_context.hash(password)
 
-def verify_password(plain_paswword: str, hashed_password: str) -> bool:
-    return pwd_context.verify(plain_paswword, hashed_password)
+def verify_password(plain_password: str, hashed_password: str) -> bool:
+    return pwd_context.verify(plain_password, hashed_password)
 
 async def authenticate_user(email: EmailStr, password: str):
     user = await UsersDAO.find_one_or_none(email=email)
-    if not user or not verify_password(password, user.password):
-        return None
+    if not (user and verify_password(password, user.hashed_password)):
+        raise IncorrectEmailOrPasswordException
     return user
 
 def create_access_token(data: dict) -> str:
